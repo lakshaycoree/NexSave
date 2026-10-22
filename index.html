@@ -1,0 +1,127 @@
+index.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Saving Calendar</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101522;color:#f5f7ff;font-family:Arial,sans-serif;padding:18px}
+header{text-align:center;padding:15px 0}
+h1{font-size:27px;margin:8px}
+p{color:#aeb9d1}
+.card{background:#1c2638;border:1px solid #33415b;border-radius:16px;padding:16px;margin:14px 0}
+.total{font-size:34px;font-weight:bold;color:#67e8a5;margin:8px 0}
+button,input,select{font:inherit;border-radius:10px;padding:11px;border:1px solid #485873;background:#111a2a;color:white}
+button{cursor:pointer;background:#276749;border:0}
+input{width:100%;margin:6px 0 12px}
+.controls{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.controls button{padding:9px}
+#month{font-weight:bold}
+.week,.calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.week div{text-align:center;color:#aeb9d1;font-size:12px;padding:7px 0}
+.day{min-height:62px;padding:5px 1px;background:#111a2a;border:1px solid #33415b;border-radius:9px;text-align:center;font-size:13px}
+.day.done{background:#17543e;border-color:#36b77c}
+.day small{display:block;font-size:10px;margin-top:5px}
+.day:disabled{opacity:.4}
+label{display:block;color:#cbd5e1;font-size:14px}
+button.secondary{background:#354158}
+button.full{width:100%}
+.note{font-size:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+<div style="font-size:38px">💰</div>
+<h1>My Saving Calendar</h1>
+<p>Chhoti saving, bade sapne ✨</p>
+</header>
+
+<div class="card">
+<label>💵 Daily saving target (₹)</label>
+<input id="target" type="number" min="1" value="20">
+<button class="full" onclick="saveTarget()">Save Daily Target</button>
+<div style="margin-top:18px">Total Savings</div>
+<div class="total" id="total">₹0</div>
+<p id="stats">0 saving days completed</p>
+</div>
+
+<div class="card">
+<h3>📅 Saving Calendar</h3>
+<div class="controls">
+<button class="secondary" onclick="changeMonth(-1)">◀</button>
+<div id="month"></div>
+<button class="secondary" onclick="changeMonth(1)">▶</button>
+</div>
+<div class="week">
+<div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+</div>
+<div class="calendar" id="calendar"></div>
+<p class="note">Din par tap karke saving mark kar. Dobara tap karne par unmark ho jayega.</p>
+</div>
+
+<div class="card">
+<h3>➕ Extra Money Add Karo</h3>
+<label>Amount (₹)</label>
+<input id="extraAmount" type="number" min="1" placeholder="Jaise 50">
+<label>Date</label>
+<input id="extraDate" type="date">
+<label>Note (optional)</label>
+<input id="extraNote" placeholder="Jaise gift money">
+<button class="full" onclick="addExtra()">Add Extra Saving</button>
+<div id="extras"></div>
+</div>
+
+<div class="card">
+<h3>📊 Monthly Summary</h3>
+<div id="summary"></div>
+</div>
+
+<div class="card">
+<button class="secondary full" onclick="exportData()">Download Backup (JSON)</button>
+<p class="note">Data isi browser mein save hota hai. Browser data clear karne ya phone badalne par data kho sakta hai. Backup regularly download karna.</p>
+</div>
+
+<script>
+const KEY="mySavingCalendarV1";
+let data;
+try{data=JSON.parse(localStorage.getItem(KEY))||{target:20,days:{},extras:[]}}catch(e){data={target:20,days:{},extras:[]}}
+let shown=new Date();
+const $=id=>document.getElementById(id);
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));render()}catch(e){alert("Storage full ya unavailable. Backup download karo.")}}
+function saveTarget(){let n=Number($("target").value);if(!Number.isFinite(n)||n<1)return alert("Daily target 1 ya usse zyada rakho.");data.target=n;persist()}
+function dateKey(y,m,d){return y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0")}
+function changeMonth(n){shown=new Date(shown.getFullYear(),shown.getMonth()+n,1);render()}
+function toggleDay(key){if(data.days[key])delete data.days[key];else data.days[key]=data.target;persist()}
+function addExtra(){let amount=Number($("extraAmount").value),date=$("extraDate").value,note=$("extraNote").value.trim();if(!Number.isFinite(amount)||amount<=0||!date)return alert("Sahi amount aur date bharo.");data.extras.push({id:Date.now(),amount,date,note});$("extraAmount").value="";$("extraNote").value="";persist()}
+function removeExtra(id){if(confirm("Is extra entry ko delete karein?")){data.extras=data.extras.filter(x=>x.id!==id);persist()}}
+function money(n){return "₹"+Number(n).toLocaleString("en-IN",{maximumFractionDigits:2})}
+function render(){
+$("target").value=data.target;
+$("month").textContent=shown.toLocaleDateString("en-IN",{month:"long",year:"numeric"});
+let y=shown.getFullYear(),m=shown.getMonth(),first=new Date(y,m,1).getDay(),last=new Date(y,m+1,0).getDate(),html="";
+for(let i=0;i<first;i++)html+="<div></div>";
+for(let d=1;d<=last;d++){
+let k=dateKey(y,m,d),done=Object.hasOwn(data.days,k),future=new Date(y,m,d)>new Date(new Date().toDateString());
+html+='<button class="day '+(done?'done':'')+'" '+(future?'disabled':'')+' onclick="toggleDay(\''+k+'\')">'+d+'<small>'+(done?'✓ '+money(data.days[k]):'＋ Save')+'</small></button>';
+}
+$("calendar").innerHTML=html;
+let dayTotal=Object.values(data.days).reduce((a,b)=>a+Number(b),0);
+let extraTotal=data.extras.reduce((a,b)=>a+Number(b.amount),0);
+$("total").textContent=money(dayTotal+extraTotal);
+$("stats").textContent=Object.keys(data.days).length+" saving days completed · Extra: "+money(extraTotal);
+let prefix=y+"-"+String(m+1).padStart(2,"0")+"-";
+let monthlyDays=Object.entries(data.days).filter(([k])=>k.startsWith(prefix)).reduce((a,[,v])=>a+Number(v),0);
+let monthlyExtra=data.extras.filter(x=>x.date.startsWith(prefix)).reduce((a,x)=>a+Number(x.amount),0);
+$("summary").innerHTML="Daily savings: <b>"+money(monthlyDays)+"</b><br><br>Extra savings: <b>"+money(monthlyExtra)+"</b><br><br>Monthly total: <b style='color:#67e8a5'>"+money(monthlyDays+monthlyExtra)+"</b>";
+$("extras").innerHTML=data.extras.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>"<p>"+x.date+" · <b>"+money(x.amount)+"</b>"+(x.note?" — "+esc(x.note):"")+" <button class='secondary' onclick='removeExtra("+x.id+")'>Delete</button></p>").join("")||"<p>No extra savings yet.</p>";
+}
+function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function exportData(){let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="saving-calendar-backup.json";a.click();URL.revokeObjectURL(url)}
+$("extraDate").value=new Date().toLocaleDateString("en-CA");
+render();
+</script>
+</body>
+</html>
